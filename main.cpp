@@ -25,15 +25,20 @@ struct ServiceBus
 template<typename T>
 struct AutoBrake
 {
-    AutoBrake(const T& publish) : publish{publish}, speed{}
+    AutoBrake(const T& publish) : publish{publish}, speed{}, collision_threshold{5L}
     {
 
     }
 
-    void observe(const SpeedUpdate&){}
+    void observe(const SpeedUpdate& x)
+    {
+        speed = x.Velocity;
+    }
     void observe(const Car_Detected&){}
     void set_collision_threshold (double x)
     {
+        if (x < 1)
+            throw std::runtime_error{"Collision less then 1"};
         collision_threshold = x;
     }
     auto get_collision_threshold()
@@ -60,13 +65,45 @@ constexpr void assert_that(bool statement, const char* message)
     if(!statement) throw std::runtime_error(message);
 }
 
+void initial_sensetivity_is_five()
+{
+    AutoBrake autoBrake{[](BrakeCommand&){}};
+    assert_that(autoBrake.get_collision_threshold() == 5L, "sensitivity is not 5");
+}
+
 void inititial_speed_is_zero()
 {
     AutoBrake autoBrake{[](const BrakeCommand&){}};
     assert_that(autoBrake.get_speed() == 0L, "speed is not zero");
 }
 
-void rut_unit_test(void(*unitTest)(), const char* name)
+void sensitivity_grater_than_1()
+{
+    AutoBrake autoBrake{[](){}};
+    try
+    {
+        autoBrake.set_collision_threshold(0.5L);
+    }
+    catch (const std::exception&)
+    {
+        return;
+    }
+    assert_that(false, "no exception thrown");
+}
+
+void speed_is_saved()
+{
+    AutoBrake autoBrake{[](){}};
+    autoBrake.observe(SpeedUpdate{100L});
+    assert_that(100L == autoBrake.get_speed(), "speed not saved to 100");
+    autoBrake.observe(SpeedUpdate{50L});
+    assert_that(50L == autoBrake.get_speed(), "speed not saved to 50");
+    autoBrake.observe(SpeedUpdate{0L});
+    assert_that(0L == autoBrake.get_speed(), "speed not saved to 0");
+
+}
+
+void run_unit_test(void(*unitTest)(), const char* name)
 {
     try
     {
@@ -75,11 +112,11 @@ void rut_unit_test(void(*unitTest)(), const char* name)
     }
     catch (const std::exception& e)
     {
-        printf("[-] %s:\t Test failure:\nError: %s\n", name, e.what());
+        printf("[-] %s:\t Test failure: %s", name, e.what());
     }
 }
 
-//void rut_unit_test(std::function<void()> unittest, const char* name)
+//void run_unit_test(std::function<void()> unittest, const char* name)
 //{
 //
 //}
@@ -98,6 +135,9 @@ int main() {
 //
 //    }
 
-    rut_unit_test(inititial_speed_is_zero, "initial speed is 0");
+    run_unit_test(inititial_speed_is_zero, "initial speed is 0");
+    run_unit_test(initial_sensetivity_is_five, "initial sensitivity is 5");
+    run_unit_test(sensitivity_grater_than_1, "Sensitivity grater than 1");
+    run_unit_test(speed_is_saved, "Speed is saved");
 }
 
